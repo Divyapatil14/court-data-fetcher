@@ -1,58 +1,51 @@
 from flask import Flask, render_template, request
 import sqlite3
 from bs4 import BeautifulSoup
+from datetime import datetime
 
 app = Flask(__name__)
 
-# ✅ Function to safely parse mock HTML
 def parse_mock_html():
-    with open('templates/mock_case.html', 'r', encoding='utf-8') as file:
-        soup = BeautifulSoup(file, 'html.parser')
+    with open('templates/mock_case.html', 'r', encoding='utf-8') as f:
+        soup = BeautifulSoup(f, 'html.parser')
 
-    # Safely find all elements
-    h3_tag = soup.find("h3")
-    parties_tag = soup.find("p", text=lambda t: t and "Parties:" in t)
-    filing_date_tag = soup.find("p", text=lambda t: t and "Filing Date:" in t)
-    next_hearing_tag = soup.find("p", text=lambda t: t and "Next Hearing:" in t)
-    order_link_tag = soup.find("a", href=True)
+    h3 = soup.find('h3')
+    def find_p(label):
+        p = soup.find('p', string=lambda t: t and label in t)
+        return p.text.replace(label, '').strip() if p else "N/A"
 
-    # Return details with checks for None
+    order = soup.find('a', href=True)
     return {
-        "status": h3_tag.text.replace("Case Status:", "").strip() if h3_tag else "N/A",
-        "parties": parties_tag.text.replace("Parties:", "").strip() if parties_tag else "N/A",
-        "filing_date": filing_date_tag.text.replace("Filing Date:", "").strip() if filing_date_tag else "N/A",
-        "next_hearing": next_hearing_tag.text.replace("Next Hearing:", "").strip() if next_hearing_tag else "N/A",
-        "order_link": order_link_tag['href'] if order_link_tag else "#"
+        "status": h3.text.replace("Case Status:", "").strip() if h3 else "N/A",
+        "parties": find_p("Parties:"),
+        "filing_date": find_p("Filing Date:"),
+        "next_hearing": find_p("Next Hearing:"),
+        "order_link": order['href'] if order else "#"
     }
 
-# ✅ Main route for form and display
 @app.route('/', methods=['GET', 'POST'])
-@app.route('/history')
-def view_history():
-    conn = sqlite3.connect('search_history.db')
-    c = conn.cursor()
-    c.execute("SELECT * FROM searches ORDER BY rowid DESC")
-    rows = c.fetchall()
-    conn.close()
-    return render_template('history.html', searches=rows)
-
 def index():
     case_details = None
 
     if request.method == 'POST':
-        case_type = request.form['case_type']
-        case_number = request.form['case_number']
-        filing_year = request.form['filing_year']
+        case_type = request.form.get('case_type', '').strip()
+        case_number = request.form.get('case_number', '').strip()
+        filing_year = request.form.get('filing_year', '').strip()
 
-        # ✅ Save to SQLite
+        # generate Python timestamp (string)
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Save to DB (explicitly include timestamp)
         conn = sqlite3.connect('search_history.db')
-        c = conn.cursor()
-        c.execute("INSERT INTO searches (case_type, case_number, filing_year) VALUES (?, ?, ?)",
-                  (case_type, case_number, filing_year))
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO searches (case_type, case_number, filing_year, timestamp) VALUES (?, ?, ?, ?)",
+            (case_type, case_number, filing_year, ts)
+        )
         conn.commit()
         conn.close()
 
-        # ✅ Parse mock case data
+        # parse mock HTML to show details
         case_details = parse_mock_html()
 
     return render_template('index.html', case_details=case_details)
@@ -60,15 +53,16 @@ def index():
 @app.route('/history')
 def history():
     conn = sqlite3.connect('search_history.db')
-    c = conn.cursor()
-    c.execute("SELECT case_type, case_number, filing_year, timestamp FROM searches ORDER BY rowid DESC")
-    history_data = c.fetchall()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT case_type, case_number, filing_year, timestamp FROM searches ORDER BY rowid DESC")
+    rows = cursor.fetchall()
     conn.close()
+    return render_template('history.html', history=rows)
 
-    return render_template('history.html', history=history_data)
-
-# ✅ Run app
 if __name__ == '__main__':
     app.run(debug=True)
+
+
 
     

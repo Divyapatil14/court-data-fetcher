@@ -6,8 +6,7 @@
 </head>
 <body class="bg-light">
 <div class="container mt-5">
-    <h2 class="mb-4 text-center">Search History</h2>
-
+    <h2 class="text-center mb-4">Search History</h2>
     <table class="table table-bordered table-striped">
         <thead class="table-dark">
             <tr>
@@ -18,22 +17,29 @@
             </tr>
         </thead>
         <tbody>
-            {% for entry in history %}
-            <tr>
-                <td>{{ entry[0] }}</td>
-                <td>{{ entry[1] }}</td>
-                <td>{{ entry[2] }}</td>
-                <td>{{ entry[3] }}</td>
-            </tr>
-            {% endfor %}
+            {% if history %}
+                {% for row in history %}
+                <tr>
+                    <td>{{ row['case_type'] }}</td>
+                    <td>{{ row['case_number'] }}</td>
+                    <td>{{ row['filing_year'] }}</td>
+                    <td>{{ row['timestamp'] }}</td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="4" class="text-center">No history found</td>
+                </tr>
+            {% endif %}
         </tbody>
     </table>
-
-    <div class="text-center">
-        <a href="/" class="btn btn-outline-primary">🔙 Back to Home</a>
+    <div class="text-center mt-4">
+        <a href="{{ url_for('index') }}" class="btn btn-primary">← Back to Home</a>
     </div>
 </div>
 </body>
 </html>
+
+
 
 
